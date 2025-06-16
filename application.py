@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from pymongo import MongoClient
+
+from settings import settings
 
 # Load environment variables from .env file at startup
 env_path = Path(__file__).parent / '.env'
@@ -52,12 +55,14 @@ job_status = defaultdict(lambda: {
 })
 
 mongodb = None
-if mongo_uri := os.getenv("MONGODB_URI"):
+mongo_uri = settings.MONGODB_URI
+if mongo_uri:
     try:
         mongodb = MongoDBService(mongo_uri)
         logger.info("MongoDB integration enabled")
     except Exception as e:
         logger.warning(f"Failed to initialize MongoDB: {e}. Continuing without persistence.")
+
 
 class ResearchRequest(BaseModel):
     company: str
@@ -65,13 +70,16 @@ class ResearchRequest(BaseModel):
     industry: str | None = None
     hq_location: str | None = None
 
+
 class PDFGenerationRequest(BaseModel):
     report_content: str
     company_name: str | None = None
 
+
 class GeneratePDFRequest(BaseModel):
     report_content: str
     company_name: str | None = None
+
 
 @app.options("/research")
 async def preflight():
@@ -80,6 +88,7 @@ async def preflight():
     response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
+
 
 @app.post("/research")
 async def research(data: ResearchRequest):
@@ -103,6 +112,7 @@ async def research(data: ResearchRequest):
         logger.error(f"Error initiating research: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+
 async def process_research(job_id: str, data: ResearchRequest):
     try:
         if mongodb:
@@ -123,7 +133,7 @@ async def process_research(job_id: str, data: ResearchRequest):
         state = {}
         async for s in graph.run(thread={}):
             state.update(s)
-        
+
         # Look for the compiled report in either location.
         report_content = state.get('report') or (state.get('editor') or {}).get('report')
         if report_content:
@@ -149,12 +159,12 @@ async def process_research(job_id: str, data: ResearchRequest):
         else:
             logger.error(f"Research completed without finding report. State keys: {list(state.keys())}")
             logger.error(f"Editor state: {state.get('editor', {})}")
-            
+
             # Check if there was a specific error in the state
             error_message = "No report found"
             if error := state.get('error'):
                 error_message = f"Error: {error}"
-            
+
             await manager.send_status_update(
                 job_id=job_id,
                 status="failed",
@@ -172,9 +182,12 @@ async def process_research(job_id: str, data: ResearchRequest):
         )
         if mongodb:
             mongodb.update_job(job_id=job_id, status="failed", error=str(e))
+
+
 @app.get("/")
 async def ping():
     return {"message": "Alive"}
+
 
 @app.get("/research/pdf/{filename}")
 async def get_pdf(filename: str):
@@ -182,6 +195,7 @@ async def get_pdf(filename: str):
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="PDF not found")
     return FileResponse(pdf_path, media_type='application/pdf', filename=filename)
+
 
 @app.websocket("/research/ws/{job_id}")
 async def websocket_endpoint(websocket: WebSocket, job_id: str):
@@ -210,6 +224,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
         logger.error(f"WebSocket error for job {job_id}: {str(e)}", exc_info=True)
         manager.disconnect(websocket, job_id)
 
+
 @app.get("/research/{job_id}")
 async def get_research(job_id: str):
     if not mongodb:
@@ -219,6 +234,7 @@ async def get_research(job_id: str):
         raise HTTPException(status_code=404, detail="Research job not found")
     return job
 
+
 @app.get("/research/{job_id}/report")
 async def get_research_report(job_id: str):
     if not mongodb:
@@ -227,15 +243,17 @@ async def get_research_report(job_id: str):
             if report := result.get("report"):
                 return {"report": report}
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     report = mongodb.get_report(job_id)
     if not report:
         raise HTTPException(status_code=404, detail="Research report not found")
     return report
 
+
 @app.post("/research/{job_id}/generate-pdf")
 async def generate_pdf(job_id: str):
     return pdf_service.generate_pdf_from_job(job_id, job_status, mongodb)
+
 
 @app.post("/generate-pdf")
 async def generate_pdf(data: GeneratePDFRequest):
@@ -255,6 +273,7 @@ async def generate_pdf(data: GeneratePDFRequest):
             raise HTTPException(status_code=500, detail=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

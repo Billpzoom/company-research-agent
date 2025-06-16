@@ -40,115 +40,163 @@ class BaseResearcher:
         websocket_manager = state.get('websocket_manager')
         job_id = state.get('job_id')
         
-        try:
-            logger.info(f"Generating queries for {company} as {self.analyst_type}")
-            
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are researching {company}, a company in the {industry} industry."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"""Researching {company} on {datetime.now().strftime("%B %d, %Y")}.
+        # 设置重试参数
+        max_retries = 3
+        retry_delay = 2  # 秒
+        timeout = 30.0  # 秒
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Generating queries for {company} as {self.analyst_type} (attempt {attempt+1}/{max_retries})")
+                
+                # 创建一个超时任务
+                async def openai_request():
+                    return await self.openai_client.chat.completions.create(
+                        model="gpt-4",  # 使用更稳定的模型
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": f"You are researching {company}, a company in the {industry} industry."
+                            },
+                            {
+                                "role": "user",
+                                "content": f"""Researching {company} on {datetime.now().strftime("%B %d, %Y")}.
 {self._format_query_prompt(prompt, company, hq, current_year)}"""
-                    }
-                ],
-                temperature=0,
-                max_tokens=4096,
-                stream=True
-            )
-            
-            queries = []
-            current_query = ""
-            current_query_number = 1
-
-            async for chunk in response:
-                if chunk.choices[0].finish_reason == "stop":
-                    break
-                    
-                content = chunk.choices[0].delta.content
-                if content:
-                    current_query += content
-                    
-                    # Stream the current state to the UI.
-                    if websocket_manager and job_id:
-                        await websocket_manager.send_status_update(
-                            job_id=job_id,
-                            status="query_generating",
-                            message="Generating research query",
-                            result={
-                                "query": current_query,
-                                "query_number": current_query_number,
-                                "category": self.analyst_type,
-                                "is_complete": False
                             }
-                        )
-                    
-                    # If a newline is detected, treat it as a complete query.
-                    if '\n' in current_query:
-                        parts = current_query.split('\n')
-                        current_query = parts[-1]  # The last part is the start of the next query.
-                        
-                        for query in parts[:-1]:
-                            query = query.strip()
-                            if query:
-                                queries.append(query)
+                        ],
+                        temperature=0,
+                        max_tokens=4096,
+                        stream=True,
+                        timeout=timeout  # 添加超时设置
+                    )
+                
+                try:
+                    # 使用asyncio.wait_for添加超时控制
+                    response = await asyncio.wait_for(openai_request(), timeout=timeout)
+            
+                    queries = []
+                    current_query = ""
+                    current_query_number = 1
+
+                    try:
+                        async for chunk in response:
+                            if chunk.choices[0].finish_reason == "stop":
+                                break
+                                
+                            content = chunk.choices[0].delta.content
+                            if content:
+                                current_query += content
+                                
+                                # Stream the current state to the UI.
                                 if websocket_manager and job_id:
                                     await websocket_manager.send_status_update(
                                         job_id=job_id,
-                                        status="query_generated",
-                                        message="Generated new research query",
+                                        status="query_generating",
+                                        message=f"Generating research query for {company}",
                                         result={
-                                            "query": query,
-                                            "query_number": len(queries),
+                                            "query": current_query,
+                                            "query_number": current_query_number,
                                             "category": self.analyst_type,
-                                            "is_complete": True
+                                            "is_complete": False
                                         }
                                     )
-                                current_query_number += 1
+                                
+                                # If a newline is detected, treat it as a complete query.
+                                if '\n' in current_query:
+                                    parts = current_query.split('\n')
+                                    current_query = parts[-1]  # The last part is the start of the next query.
+                                    
+                                    for query in parts[:-1]:
+                                        query = query.strip()
+                                        if query:
+                                            queries.append(query)
+                                            if websocket_manager and job_id:
+                                                await websocket_manager.send_status_update(
+                                                    job_id=job_id,
+                                                    status="query_generated",
+                                                    message=f"Generated new research query for {company}",
+                                                    result={
+                                                        "query": query,
+                                                        "query_number": len(queries),
+                                                        "category": self.analyst_type,
+                                                        "is_complete": True
+                                                    }
+                                                )
+                                            current_query_number += 1
 
-            # Add any remaining query (even if not newline terminated)
-            if current_query.strip():
-                query = current_query.strip()
-                queries.append(query)
+                        # Add any remaining query (even if not newline terminated)
+                        if current_query.strip():
+                            query = current_query.strip()
+                            queries.append(query)
+                            if websocket_manager and job_id:
+                                await websocket_manager.send_status_update(
+                                    job_id=job_id,
+                                    status="query_generated",
+                                    message=f"Generated final research query for {company}",
+                                    result={
+                                        "query": query,
+                                        "query_number": len(queries),
+                                        "category": self.analyst_type,
+                                        "is_complete": True
+                                    }
+                                )
+                            current_query_number += 1
+                        
+                        logger.info(f"Generated {len(queries)} queries for {self.analyst_type}: {queries}")
+
+                        if not queries:
+                            raise ValueError(f"No queries generated for {company}")
+
+                        # Limit to at most 4 queries.
+                        queries = queries[:4]
+                        logger.info(f"Final queries for {self.analyst_type}: {queries}")
+                        
+                        return queries
+
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Stream processing timed out for {company}")
+                        raise  # Re-raise to be caught by outer try-except
+
+                except (asyncio.TimeoutError, Exception) as e:
+                    if isinstance(e, asyncio.TimeoutError):
+                        error_msg = f"Request timed out for {company}"
+                    else:
+                        error_msg = f"Error processing response for {company}: {str(e)}"
+                    
+                    logger.error(error_msg)
+                    
+                    if attempt < max_retries - 1:
+                        # 如果不是最后一次尝试，则等待后重试
+                        retry_time = retry_delay * (2 ** attempt)  # 指数退避
+                        logger.info(f"Retrying in {retry_time} seconds... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(retry_time)
+                        continue
+                    
+                    # 最后一次尝试也失败了，返回默认查询
+                    if websocket_manager and job_id:
+                        await websocket_manager.send_status_update(
+                            job_id=job_id,
+                            status="warning",
+                            message=f"Using fallback queries for {company} after {max_retries} failed attempts",
+                            result={
+                                "step": "Research",
+                                "substep": "query_generation_fallback",
+                                "analyst": self.analyst_type,
+                                "error": error_msg
+                            }
+                        )
+                    return self._fallback_queries(company, current_year)
+
+            except Exception as e:
+                logger.error(f"Unexpected error for {company}: {e}")
                 if websocket_manager and job_id:
                     await websocket_manager.send_status_update(
                         job_id=job_id,
-                        status="query_generated",
-                        message="Generated final research query",
-                        result={
-                            "query": query,
-                            "query_number": len(queries),
-                            "category": self.analyst_type,
-                            "is_complete": True
-                        }
+                        status="error",
+                        message=f"Failed to generate research queries: {str(e)}",
+                        error=f"Query generation failed: {str(e)}"
                     )
-                current_query_number += 1
-            
-            logger.info(f"Generated {len(queries)} queries for {self.analyst_type}: {queries}")
-
-            if not queries:
-                raise ValueError(f"No queries generated for {company}")
-
-            # Limit to at most 4 queries.
-            queries = queries[:4]
-            logger.info(f"Final queries for {self.analyst_type}: {queries}")
-            
-            return queries
-            
-        except Exception as e:
-            logger.error(f"Error generating queries for {company}: {e}")
-            if websocket_manager and job_id:
-                await websocket_manager.send_status_update(
-                    job_id=job_id,
-                    status="error",
-                    message=f"Failed to generate research queries: {str(e)}",
-                    error=f"Query generation failed: {str(e)}"
-                )
-            return []
+                return self._fallback_queries(company, current_year)
 
     def _format_query_prompt(self, prompt, company, hq, year):
         return f"""{prompt}
@@ -159,13 +207,47 @@ class BaseResearcher:
         - Provide exactly 4 search queries (one per line), with no hyphens or dashes
         - DO NOT make assumptions about the industry - use only the provided industry information"""
 
-    def _fallback_queries(self, company, year):
-        return [
-            f"{company} overview {year}",
-            f"{company} recent news {year}",
-            f"{company} financial reports {year}",
-            f"{company} industry analysis {year}"
-        ]
+    def _fallback_queries(self, company: str, year: int) -> List[str]:
+        """Generate fallback queries when API calls fail."""
+        logger.info(f"Using fallback queries for {company} as {self.analyst_type}")
+        
+        # 根据分析师类型选择合适的查询模板
+        if self.analyst_type == "company_analyzer":
+            return [
+                f"{company} company overview {year}",
+                f"{company} business model",
+                f"{company} products and services",
+                f"{company} leadership team"
+            ]
+        elif self.analyst_type == "financial_analyzer":
+            return [
+                f"{company} financial performance {year}",
+                f"{company} revenue {year}",
+                f"{company} financial reports {year}",
+                f"{company} profit margin"
+            ]
+        elif self.analyst_type == "industry_analyzer":
+            return [
+                f"{company} industry position {year}",
+                f"{company} market share",
+                f"{company} competitors analysis",
+                f"{company} industry trends {year}"
+            ]
+        elif self.analyst_type == "news_analyzer":
+            return [
+                f"{company} latest news {year}",
+                f"{company} recent developments",
+                f"{company} press releases {year}",
+                f"{company} recent announcements"
+            ]
+        else:
+            # 默认查询
+            return [
+                f"{company} overview {year}",
+                f"{company} recent news {year}",
+                f"{company} financial reports {year}",
+                f"{company} industry analysis {year}"
+            ]
 
     async def search_single_query(self, query: str, websocket_manager=None, job_id=None) -> Dict[str, Any]:
         """Execute a single search query with proper error handling."""

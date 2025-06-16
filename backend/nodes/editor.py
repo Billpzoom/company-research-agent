@@ -9,17 +9,18 @@ logger = logging.getLogger(__name__)
 from ..classes import ResearchState
 from ..utils.references import format_references_section
 
+
 class Editor:
     """Compiles individual section briefings into a cohesive final report."""
-    
+
     def __init__(self) -> None:
         self.openai_key = os.getenv("OPENAI_API_KEY")
         if not self.openai_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
-        
+
         # Configure OpenAI
-        self.openai_client = AsyncOpenAI(api_key=self.openai_key)
-        
+        self.openai_client = AsyncOpenAI(api_key=self.openai_key, base_url='https://api.openai-proxy.org/v1' )
+
         # Initialize context dictionary for use across methods
         self.context = {
             "company": "Unknown Company",
@@ -30,14 +31,14 @@ class Editor:
     async def compile_briefings(self, state: ResearchState) -> ResearchState:
         """Compile individual briefing categories from state into a final report."""
         company = state.get('company', 'Unknown Company')
-        
+
         # Update context with values from state
         self.context = {
             "company": company,
             "industry": state.get('industry', 'Unknown'),
             "hq_location": state.get('hq_location', 'Unknown')
         }
-        
+
         # Send initial compilation status
         if websocket_manager := state.get('websocket_manager'):
             if job_id := state.get('job_id'):
@@ -56,9 +57,9 @@ class Editor:
             "industry": state.get('industry', 'Unknown'),
             "hq_location": state.get('hq_location', 'Unknown')
         }
-        
+
         msg = [f"📑 Compiling final report for {company}..."]
-        
+
         # Pull individual briefings from dedicated state keys
         briefing_keys = {
             'company': 'company_briefing',
@@ -88,7 +89,7 @@ class Editor:
             else:
                 msg.append(f"No {category} briefing available")
                 logger.error(f"Missing state key: {key}")
-        
+
         if not individual_briefings:
             msg.append("\n⚠️ No briefing sections available to compile")
             logger.error("No briefings found in state")
@@ -103,12 +104,12 @@ class Editor:
                 logger.error(f"Error during report compilation: {e}")
         state.setdefault('messages', []).append(AIMessage(content="\n".join(msg)))
         return state
-    
+
     async def edit_report(self, state: ResearchState, briefings: Dict[str, str], context: Dict[str, Any]) -> str:
         """Compile section briefings into a final report and update the state."""
         try:
             company = self.context["company"]
-            
+
             # Step 1: Initial Compilation
             if websocket_manager := state.get('websocket_manager'):
                 if job_id := state.get('job_id'):
@@ -153,17 +154,17 @@ class Editor:
                         }
                     )
             final_report = await self.content_sweep(state, edited_report, company)
-            
+
             final_report = final_report or ""
-            
+
             logger.info(f"Final report compiled with {len(final_report)} characters")
             if not final_report.strip():
                 logger.error("Final report is empty!")
                 return ""
-            
+
             logger.info("Final report preview:")
             logger.info(final_report[:500])
-            
+
             # Update state with the final report in two locations
             state['report'] = final_report
             state['status'] = "editor_complete"
@@ -171,7 +172,7 @@ class Editor:
                 state['editor'] = {}
             state['editor']['report'] = final_report
             logger.info(f"Report length in state: {len(state.get('report', ''))}")
-            
+
             if websocket_manager := state.get('websocket_manager'):
                 if job_id := state.get('job_id'):
                     await websocket_manager.send_status_update(
@@ -186,37 +187,37 @@ class Editor:
                             "status": "completed"
                         }
                     )
-            
+
             return final_report
         except Exception as e:
             logger.error(f"Error in edit_report: {e}")
             return ""
-    
+
     async def compile_content(self, state: ResearchState, briefings: Dict[str, str], company: str) -> str:
         """Initial compilation of research sections."""
         combined_content = "\n\n".join(content for content in briefings.values())
-        
+
         references = state.get('references', [])
         reference_text = ""
         if references:
             logger.info(f"Found {len(references)} references to add during compilation")
-            
+
             # Get pre-processed reference info from curator
             reference_info = state.get('reference_info', {})
             reference_titles = state.get('reference_titles', {})
-            
+
             logger.info(f"Reference info from state: {reference_info}")
             logger.info(f"Reference titles from state: {reference_titles}")
-            
+
             # Use the references module to format the references section
             reference_text = format_references_section(references, reference_info, reference_titles)
             logger.info(f"Added {len(references)} references during compilation")
-        
+
         # Use values from centralized context
         company = self.context["company"]
         industry = self.context["industry"]
         hq_location = self.context["hq_location"]
-        
+
         prompt = f"""You are compiling a comprehensive research report about {company}.
 
 Compiled briefings:
@@ -246,7 +247,7 @@ Strictly enforce this EXACT document structure:
 [News content with ### subsections]
 
 Return the report in clean markdown format. No explanations or commentary."""
-        
+
         try:
             response = await self.openai_client.chat.completions.create(
                 model="gpt-4.1",
@@ -264,23 +265,23 @@ Return the report in clean markdown format. No explanations or commentary."""
                 stream=False
             )
             initial_report = response.choices[0].message.content.strip()
-            
+
             # Append the references section after LLM processing
             if reference_text:
                 initial_report = f"{initial_report}\n\n{reference_text}"
-            
+
             return initial_report
         except Exception as e:
             logger.error(f"Error in initial compilation: {e}")
             return (combined_content or "").strip()
-        
+
     async def content_sweep(self, state: ResearchState, content: str, company: str) -> str:
         """Sweep the content for any redundant information."""
         # Use values from centralized context
         company = self.context["company"]
         industry = self.context["industry"]
         hq_location = self.context["hq_location"]
-        
+
         prompt = f"""You are an expert briefing editor. You are given a report on {company}.
 
 Current report:
@@ -328,10 +329,10 @@ Critical rules:
 Return the polished report in flawless markdown format. No explanation.
 
 Return the cleaned report in flawless markdown format. No explanations or commentary."""
-        
+
         try:
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4.1-mini", 
+                model="gpt-4.1-mini",
                 messages=[
                     {
                         "role": "system",
@@ -345,10 +346,10 @@ Return the cleaned report in flawless markdown format. No explanations or commen
                 temperature=0,
                 stream=True
             )
-            
+
             accumulated_text = ""
             buffer = ""
-            
+
             async for chunk in response:
                 if chunk.choices[0].finish_reason == "stop":
                     websocket_manager = state.get('websocket_manager')
@@ -365,12 +366,12 @@ Return the cleaned report in flawless markdown format. No explanations or commen
                                 }
                             )
                     break
-                    
+
                 chunk_text = chunk.choices[0].delta.content
                 if chunk_text:
                     accumulated_text += chunk_text
                     buffer += chunk_text
-                    
+
                     if any(char in buffer for char in ['.', '!', '?', '\n']) and len(buffer) > 10:
                         if websocket_manager := state.get('websocket_manager'):
                             if job_id := state.get('job_id'):
@@ -384,7 +385,7 @@ Return the cleaned report in flawless markdown format. No explanations or commen
                                     }
                                 )
                         buffer = ""
-            
+
             return (accumulated_text or "").strip()
         except Exception as e:
             logger.error(f"Error in formatting: {e}")

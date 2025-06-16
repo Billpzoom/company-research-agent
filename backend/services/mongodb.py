@@ -1,16 +1,17 @@
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import certifi
+
 
 class MongoDBService:
     def __init__(self, uri: str):
         # Use certifi for SSL certificate verification with updated options
         self.client = MongoClient(
             uri,
-            tlsCAFile=certifi.where(),
-            retryWrites=True,
-            w='majority'
+            # tlsCAFile=certifi.where(),
+            # retryWrites=True,
+            # w='majority'
         )
         self.db = self.client.get_database('tavily_research')
         self.jobs = self.db.jobs
@@ -26,12 +27,12 @@ class MongoDBService:
             "updated_at": datetime.utcnow()
         })
 
-    def update_job(self, job_id: str, 
-                  status: str = None,
-                  result: Dict[str, Any] = None,
-                  error: str = None) -> None:
+    def update_job(self, job_id: str,
+                   status: str = None,
+                   result: Dict[str, Any] = None,
+                   error: str = None) -> None:
         """Update a research job with results or status."""
-        update_data = {"updated_at": datetime.utcnow()}
+        update_data = {"updated_at": datetime.now(timezone.utc)}
         if status:
             update_data["status"] = status
         if result:
@@ -61,4 +62,4 @@ class MongoDBService:
 
     def get_report(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a report by job ID."""
-        return self.reports.find_one({"job_id": job_id}) 
+        return self.reports.find_one({"job_id": job_id})

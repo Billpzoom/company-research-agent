@@ -7,22 +7,27 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+
 class Briefing:
     """Creates briefings for each research category and updates the ResearchState."""
-    
+
     def __init__(self) -> None:
         self.max_doc_length = 8000  # Maximum document content length
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         if not self.gemini_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
-        
+
         # Configure Gemini
-        genai.configure(api_key=self.gemini_key)
+        genai.configure(
+            api_key=self.gemini_key,
+            transport="rest",
+            client_options={"api_endpoint": "https://api.openai-proxy.org/google"},
+        )
         self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
 
     async def generate_category_briefing(
-        self, docs: Union[Dict[str, Any], List[Dict[str, Any]]], 
-        category: str, context: Dict[str, Any]
+            self, docs: Union[Dict[str, Any], List[Dict[str, Any]]],
+            category: str, context: Dict[str, Any]
     ) -> Dict[str, Any]:
         company = context.get('company', 'Unknown')
         industry = context.get('industry', 'Unknown')
@@ -142,21 +147,21 @@ Key requirements:
 5. Never use ### headers, only bullet points
 6. Provide only the briefing. Do not provide explanations or commentary.""",
         }
-        
+
         # Normalize docs to a list of (url, doc) tuples
         items = list(docs.items()) if isinstance(docs, dict) else [
             (doc.get('url', f'doc_{i}'), doc) for i, doc in enumerate(docs)
         ]
         # Sort documents by evaluation score (highest first)
         sorted_items = sorted(
-            items, 
-            key=lambda x: float(x[1].get('evaluation', {}).get('overall_score', '0')), 
+            items,
+            key=lambda x: float(x[1].get('evaluation', {}).get('overall_score', '0')),
             reverse=True
         )
-        
+
         doc_texts = []
         total_length = 0
-        for _ , doc in sorted_items:
+        for _, doc in sorted_items:
             title = doc.get('title', '')
             content = doc.get('raw_content') or doc.get('content', '')
             if len(content) > self.max_doc_length:
@@ -167,7 +172,7 @@ Key requirements:
                 total_length += len(doc_entry)
             else:
                 break
-        
+
         separator = "\n" + "-" * 40 + "\n"
         prompt = f"""{prompts.get(category, 'Create a focused, informative and insightful research briefing on the company: {company} in the {industry} industry based on the provided documents.')}
 
@@ -176,7 +181,7 @@ Analyze the following documents and extract key information. Provide only the br
 {separator}{separator.join(doc_texts)}{separator}
 
 """
-        
+
         try:
             logger.info("Sending prompt to LLM")
             response = self.gemini_model.generate_content(prompt)
@@ -208,7 +213,7 @@ Analyze the following documents and extract key information. Provide only the br
         company = state.get('company', 'Unknown Company')
         websocket_manager = state.get('websocket_manager')
         job_id = state.get('job_id')
-        
+
         # Send initial briefing status
         if websocket_manager and job_id:
             await websocket_manager.send_status_update(
@@ -226,7 +231,7 @@ Analyze the following documents and extract key information. Provide only the br
             "job_id": job_id
         }
         logger.info(f"Creating section briefings for {company}")
-        
+
         # Mapping of curated data fields to briefing categories
         categories = {
             'financial_data': ("financial", "financial_briefing"),
@@ -234,7 +239,7 @@ Analyze the following documents and extract key information. Provide only the br
             'industry_data': ("industry", "industry_briefing"),
             'company_data': ("company", "company_briefing")
         }
-        
+
         briefings = {}
 
         # Create tasks for parallel processing
@@ -242,10 +247,10 @@ Analyze the following documents and extract key information. Provide only the br
         for data_field, (cat, briefing_key) in categories.items():
             curated_key = f'curated_{data_field}'
             curated_data = state.get(curated_key, {})
-            
+
             if curated_data:
                 logger.info(f"Processing {data_field} with {len(curated_data)} documents")
-                
+
                 # Create task for this category
                 briefing_tasks.append({
                     'category': cat,
@@ -261,7 +266,7 @@ Analyze the following documents and extract key information. Provide only the br
         if briefing_tasks:
             # Rate limiting semaphore for LLM API
             briefing_semaphore = asyncio.Semaphore(2)  # Limit to 2 concurrent briefings
-            
+
             async def process_briefing(task: Dict[str, Any]) -> Dict[str, Any]:
                 """Process a single briefing with rate limiting."""
                 async with briefing_semaphore:
@@ -270,7 +275,7 @@ Analyze the following documents and extract key information. Provide only the br
                         task['category'],
                         context
                     )
-                    
+
                     if result['content']:
                         briefings[task['category']] = result['content']
                         state[task['briefing_key']] = result['content']
@@ -278,7 +283,7 @@ Analyze the following documents and extract key information. Provide only the br
                     else:
                         logger.error(f"Failed to generate briefing for {task['data_field']}")
                         state[task['briefing_key']] = ""
-                    
+
                     return {
                         'category': task['category'],
                         'success': bool(result['content']),
@@ -287,14 +292,15 @@ Analyze the following documents and extract key information. Provide only the br
 
             # Process all briefings in parallel
             results = await asyncio.gather(*[
-                process_briefing(task) 
+                process_briefing(task)
                 for task in briefing_tasks
             ])
-            
+
             # Log completion statistics
             successful_briefings = sum(1 for r in results if r['success'])
             total_length = sum(r['length'] for r in results)
-            logger.info(f"Generated {successful_briefings}/{len(briefing_tasks)} briefings with total length {total_length}")
+            logger.info(
+                f"Generated {successful_briefings}/{len(briefing_tasks)} briefings with total length {total_length}")
 
         state['briefings'] = briefings
         return state
