@@ -6,44 +6,44 @@ export const EXAMPLE_COMPANIES = [
   {
     name: "Stripe",
     url: "stripe.com",
-    hq: "San Francisco, CA",
-    industry: "Financial Technology"
+    hq: "美国加州旧金山",
+    industry: "金融科技"
   },
   {
     name: "Shopify",
     url: "shopify.com",
-    hq: "Ottawa, Canada",
-    industry: "E-commerce"
+    hq: "加拿大渥太华",
+    industry: "电子商务"
   },
   {
     name: "Notion",
     url: "notion.so",
-    hq: "San Francisco, CA",
-    industry: "Productivity Software"
+    hq: "美国加州旧金山",
+    industry: "生产力软件"
   },
   {
     name: "Tesla",
     url: "tesla.com",
-    hq: "Austin, TX",
-    industry: "Automotive & Energy"
+    hq: "美国德克萨斯州奥斯汀",
+    industry: "汽车与能源"
   },
   {
     name: "Airbnb",
     url: "airbnb.com",
-    hq: "San Francisco, CA",
-    industry: "Travel & Hospitality"
+    hq: "美国加州旧金山",
+    industry: "旅游与住宿"
   },
   {
     name: "Slack",
     url: "slack.com",
-    hq: "San Francisco, CA",
-    industry: "Business Communication"
+    hq: "美国加州旧金山",
+    industry: "商业通讯"
   },
   {
     name: "Spotify",
     url: "spotify.com",
-    hq: "Stockholm, Sweden",
-    industry: "Music Streaming"
+    hq: "瑞典斯德哥尔摩",
+    industry: "音乐流媒体"
   }
 ];
 
@@ -102,7 +102,7 @@ const ExamplePopup: React.FC<ExamplePopupProps> = ({
     >
       <Sparkles className="h-4 w-4 text-blue-500 group-hover:text-blue-600 animate-pulse group-hover:animate-none group-hover:scale-110 transition-all" />
       <div>
-        <span className="text-sm font-medium text-gray-700 group-hover:text-gray-800 transition-colors">Try an example: </span>
+        <span className="text-sm font-medium text-gray-700 group-hover:text-gray-800 transition-colors">尝试一个示例：</span>
         <span 
           className={`text-sm font-bold text-blue-600 group-hover:text-blue-700 transition-all inline-block
             ${isNameAnimating ? 'opacity-0 transform -translate-y-3 scale-95' : 'opacity-100 transform translate-y-0 scale-100'}`}

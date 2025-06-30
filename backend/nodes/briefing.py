@@ -49,103 +49,122 @@ class Briefing:
                 )
 
         prompts = {
-            'company': f"""Create a focused company briefing for {company}, a {industry} company based in {hq_location}.
-Key requirements:
-1. Start with: "{company} is a [what] that [does what] for [whom]"
-2. Structure using these exact headers and bullet points:
+            'company': f"""为{company}（一家位于{hq_location}的{industry}公司）创建一份重点公司简报。
+关键要求：
+1. 以这样的句式开始："{company}是一家[做什么的]，为[谁]提供[什么服务]"
+2. 使用以下确切的标题和要点结构：
 
-### Core Product/Service
-* List distinct products/features
-* Include only verified technical capabilities
+### 核心产品/服务
+* 列出独特的产品/功能
+* 仅包含经验证的技术能力
 
-### Leadership Team
-* List key leadership team members
-* Include their roles and expertise
+### 领导团队
+* 列出关键领导团队成员
+* 包括他们的角色和专长
 
-### Target Market
-* List specific target audiences
-* List verified use cases
-* List confirmed customers/partners
+### 目标市场
+* 列出特定目标受众
+* 列出经验证的使用案例
+* 列出已确认的客户/合作伙伴
 
-### Key Differentiators
-* List unique features
-* List proven advantages
+### 关键差异化因素
+* 列出独特功能
+* 列出已证实的优势
 
-### Business Model
-* Discuss product / service pricing
-* List distribution channels
+### 商业模式
+* 讨论产品/服务定价
+* 列出分销渠道
 
-3. Each bullet must be a single, complete fact
-4. Never mention "no information found" or "no data available"
-5. No paragraphs, only bullet points
-6. Provide only the briefing. No explanations or commentary.""",
+3. 每个要点必须是单一、完整的事实
+4. 不要提及"未找到信息"或"无可用数据"
+5. 不要使用段落，只使用要点
+6. 仅提供简报内容，不要解释或评论
+7. 所有内容必须使用中文输出""",
 
-            'industry': f"""Create a focused industry briefing for {company}, a {industry} company based in {hq_location}.
-Key requirements:
-1. Structure using these exact headers and bullet points:
+            'industry': f"""你是世界顶尖的行业分析师，精通市场研究、竞争情报和战略预测。为{company}（一家位于{hq_location}的{industry}公司）创建一份Gartner风格的行业分析报告。
 
-### Market Overview
-* State {company}'s exact market segment
-* List market size with year
-* List growth rate with year range
+关键要求：
+1. 基于公开数据、历史趋势和逻辑推测，生成清晰有条理的见解
+2. 用假设做数据支持的预测（要说明假设）
+3. 找出顶尖厂商，按细分领域、规模或创新性分类
+4. 指出风险、新兴玩家和未来趋势
+5. 明确区分估计数据和已知数据
 
-### Direct Competition
-* List named direct competitors
-* List specific competing products
-* List market positions
+使用以下结构：
 
-### Competitive Advantages
-• List unique technical features
-• List proven advantages
+### 1. 市场概览
+* {company}的市场定位和细分
+* 当前市场规模及增长趋势（注明数据来源年份）
+* 关键驱动因素和制约因素
 
-### Market Challenges
-• List specific verified challenges
+### 2. 主要参与者
+* 按细分领域列出TOP 3-5厂商
+* 各厂商的核心竞争力和市场份额估计
+* 新兴玩家及其创新点
 
-2. Each bullet must be a single, complete news event.
-3. No paragraphs, only bullet points
-4. Never mention "no information found" or "no data available"
-5. Provide only the briefing. No explanation.""",
+### 3. 预测（1-3年）
+* 基于[具体假设]的增长预测
+* 技术演进路线图
+* 潜在颠覆性因素
 
-            'financial': f"""Create a focused financial briefing for {company}, a {industry} company based in {hq_location}.
-Key requirements:
-1. Structure using these headers and bullet points:
+### 4. 机会与风险
+* 最具潜力的3个市场机会
+* 需要警惕的2-3个主要风险
+* 监管环境变化的影响
 
-### Funding & Investment
-* Total funding amount with date
-* List each funding round with date
-* List named investors
+### 5. 战略洞见
+* 对{company}的3条具体战略建议
+* 需要重点关注的竞争领域
+* 推荐的投资方向
 
-### Revenue Model
-* Discuss product / service pricing if applicable
+注意事项：
+1. 保持专业、简洁的分析风格
+2. 使用中文标点符号和术语
+3. 每个观点必须有数据或逻辑支持
+4. 明确标注哪些是估计，哪些是已知数据""",
 
-2. Include specific numbers when possible
-3. No paragraphs, only bullet points
-4. Never mention "no information found" or "no data available"
-5. NEVER repeat the same round of funding multiple times. ALWAYS assume that multiple funding rounds in the same month are the same round.
-6. NEVER include a range of funding amounts. Use your best judgement to determine the exact amount based on the information provided.
-6. Provide only the briefing. No explanation or commentary.""",
+            'financial': f"""为{company}（一家位于{hq_location}的{industry}公司）创建一份重点财务简报。
+关键要求：
+1. 使用以下标题和要点结构：
 
-            'news': f"""Create a focused news briefing for {company}, a {industry} company based in {hq_location}.
-Key requirements:
-1. Structure into these categories using bullet points:
+### 融资与投资
+* 总融资金额及日期
+* 列出每轮融资及日期
+* 列出具名投资者
 
-### Major Announcements
-* Product / service launches
-* New initiatives
+### 收入模式
+* 讨论产品/服务定价（如适用）
 
-### Partnerships
-* Integrations
-* Collaborations
+2. 尽可能包含具体数字
+3. 不要使用段落，只使用要点
+4. 不要提及"未找到信息"或"无可用数据"
+5. 切勿重复提及同一轮融资。始终假设同一月份的多轮融资是同一轮
+6. 不要包含融资金额范围。根据提供的信息，用你的最佳判断确定确切金额
+7. 仅提供简报内容，不要解释或评论
+8. 所有内容必须使用中文输出""",
 
-### Recognition
-* Awards
-* Press coverage
+            'news': f"""为{company}（一家位于{hq_location}的{industry}公司）创建一份重点新闻简报。
+关键要求：
+1. 使用以下类别结构和要点：
 
-2. Sort newest to oldest
-3. One event per bullet point
-4. Do not mention "no information found" or "no data available"
-5. Never use ### headers, only bullet points
-6. Provide only the briefing. Do not provide explanations or commentary.""",
+### 重大公告
+* 产品/服务发布
+* 新举措
+
+### 合作关系
+* 集成
+* 协作
+
+### 荣誉认可
+* 奖项
+* 媒体报道
+
+2. 按从新到旧排序
+3. 每个要点一个事件
+4. 不要提及"未找到信息"或"无可用数据"
+5. 不要使用###标题，只使用要点
+6. 仅提供简报内容，不要提供解释或评论
+7. 所有内容必须使用中文输出""",
         }
 
         # Normalize docs to a list of (url, doc) tuples
@@ -174,12 +193,17 @@ Key requirements:
                 break
 
         separator = "\n" + "-" * 40 + "\n"
-        prompt = f"""{prompts.get(category, 'Create a focused, informative and insightful research briefing on the company: {company} in the {industry} industry based on the provided documents.')}
+        prompt = f"""{prompts.get(category, f'请基于提供的文档，创建一份关于{industry}行业中{company}公司的重点研究简报。')}
 
-Analyze the following documents and extract key information. Provide only the briefing, no explanations or commentary:
+请分析以下文档并提取关键信息。仅提供简报内容，不要解释或评论。请使用中文输出所有内容：
 
 {separator}{separator.join(doc_texts)}{separator}
 
+注意：
+1. 所有内容必须使用中文输出
+2. 保持专业、简洁的语言风格
+3. 使用中文标点符号
+4. 保持统一的中文术语翻译
 """
 
         try:

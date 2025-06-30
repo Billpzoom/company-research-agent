@@ -218,35 +218,35 @@ class Editor:
         industry = self.context["industry"]
         hq_location = self.context["hq_location"]
 
-        prompt = f"""You are compiling a comprehensive research report about {company}.
+        prompt = f"""你正在编译关于{company}的综合研究报告。
 
-Compiled briefings:
+已编译的简报内容：
 {combined_content}
 
-Create a comprehensive and focused report on {company}, a {industry} company headquartered in {hq_location} that:
-1. Integrates information from all sections into a cohesive non-repetitive narrative
-2. Maintains important details from each section
-3. Logically organizes information and removes transitional commentary / explanations
-4. Uses clear section headers and structure
+请创建一份关于{company}（一家总部位于{hq_location}的{industry}公司）的全面而重点突出的报告，要求：
+1. 将所有部分的信息整合成一个连贯且不重复的叙述
+2. 保留每个部分的重要细节
+3. 逻辑地组织信息，删除过渡性评论/解释
+4. 使用清晰的章节标题和结构
 
-Formatting rules:
-Strictly enforce this EXACT document structure:
+格式规则：
+严格遵守以下确切的文档结构：
 
-# {company} Research Report
+# {company}研究报告
 
-## Company Overview
-[Company content with ### subsections]
+## 公司概览
+[公司内容，使用###子标题]
 
-## Industry Overview
-[Industry content with ### subsections]
+## 行业概览
+[行业内容，使用###子标题]
 
-## Financial Overview
-[Financial content with ### subsections]
+## 财务概览
+[财务内容，使用###子标题]
 
-## News
-[News content with ### subsections]
+## 新闻
+[新闻内容，使用###子标题]
 
-Return the report in clean markdown format. No explanations or commentary."""
+请以清晰的markdown格式返回报告。不要添加解释或评论。所有内容必须使用中文输出。"""
 
         try:
             response = await self.openai_client.chat.completions.create(
@@ -282,53 +282,52 @@ Return the report in clean markdown format. No explanations or commentary."""
         industry = self.context["industry"]
         hq_location = self.context["hq_location"]
 
-        prompt = f"""You are an expert briefing editor. You are given a report on {company}.
+        prompt = f"""你是一位专业的简报编辑。你收到了一份关于{company}的报告。
 
-Current report:
+当前报告：
 {content}
 
-1. Remove redundant or repetitive information
-2. Remove information that is not relevant to {company}, the {industry} company headquartered in {hq_location}.
-3. Remove sections lacking substantial content
-4. Remove any meta-commentary (e.g. "Here is the news...")
+请执行以下操作：
+1. 删除冗余或重复的信息
+2. 删除与{company}（一家总部位于{hq_location}的{industry}公司）无关的信息
+3. 删除缺乏实质内容的部分
+4. 删除任何元评论（例如"以下是新闻..."）
 
-Strictly enforce this EXACT document structure:
+严格遵守以下确切的文档结构：
 
-## Company Overview
-[Company content with ### subsections]
+## 公司概览
+[公司内容，使用###子标题]
 
-## Industry Overview
-[Industry content with ### subsections]
+## 行业概览
+[行业内容，使用###子标题]
 
-## Financial Overview
-[Financial content with ### subsections]
+## 财务概览
+[财务内容，使用###子标题]
 
-## News
-[News content with ### subsections]
+## 新闻
+[新闻内容，使用要点]
 
-## References
-[References in MLA format - PRESERVE EXACTLY AS PROVIDED]
+## 参考资料
+[MLA格式的参考资料 - 完全按原样保留]
 
-Critical rules:
-1. The document MUST start with "# {company} Research Report"
-2. The document MUST ONLY use these exact ## headers in this order:
-   - ## Company Overview
-   - ## Industry Overview
-   - ## Financial Overview
-   - ## News
-   - ## References
-3. NO OTHER ## HEADERS ARE ALLOWED
-4. Use ### for subsections in Company/Industry/Financial sections
-5. News section should only use bullet points (*), never headers
-6. Never use code blocks (```)
-7. Never use more than one blank line between sections
-8. Format all bullet points with *
-9. Add one blank line before and after each section/list
-10. DO NOT CHANGE the format of the references section
+关键规则：
+1. 文档必须以"# {company}研究报告"开头
+2. 文档必须且只能按此顺序使用以下确切的##标题：
+   - ## 公司概览
+   - ## 行业概览
+   - ## 财务概览
+   - ## 新闻
+   - ## 参考资料
+3. 不允许使用其他##标题
+4. 在公司/行业/财务部分使用###作为子标题
+5. 新闻部分应只使用要点(*)，不使用标题
+6. 不要使用代码块(```)
+7. 各部分之间不要使用超过一个空行
+8. 所有要点都使用*格式
+9. 每个部分/列表前后添加一个空行
+10. 不要更改参考资料部分的格式
 
-Return the polished report in flawless markdown format. No explanation.
-
-Return the cleaned report in flawless markdown format. No explanations or commentary."""
+请以完美的markdown格式返回润色后的报告。不要添加解释。所有内容必须使用中文输出。"""
 
         try:
             response = await self.openai_client.chat.completions.create(

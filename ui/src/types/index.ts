@@ -74,3 +74,28 @@ export type ResearchStatusProps = {
   loaderColor: string;
   statusRef: React.RefObject<HTMLDivElement>;
 }; 
+
+export type ResearchQueriesProps = {
+  queries: Array<{
+    text: string;
+    number: number;
+    category: string;
+  }>;
+  streamingQueries: {
+    [key: string]: {
+      text: string;
+      number: number;
+      category: string;
+      isComplete: boolean;
+    };
+  };
+  glassStyle: string;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  isResetting: boolean;
+};
+
+export type Category = {
+  key: "company" | "industry" | "financial" | "news";
+  label: string;
+};
